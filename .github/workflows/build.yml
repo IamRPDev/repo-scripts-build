@@ -1,0 +1,97 @@
+name: Build and Dispatch Scripts
+
+on:
+  workflow_dispatch:
+    inputs:
+      branch_input:
+        description: 'Branch to build'
+        required: true
+        default: 'both'
+        type: choice
+        options:
+          - both
+          - Piers
+          - Omega
+
+permissions:
+  contents: write
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  setup-matrix:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.set-matrix.outputs.matrix }}
+    steps:
+      - id: set-matrix
+        run: |
+          if [ "${{ github.event.inputs.branch_input }}" == "both" ]; then
+            echo 'matrix={"branch": ["Piers", "Omega"], "platform": ["linux64", "win64", "android-arm64", "osx64"]}' >> $GITHUB_OUTPUT
+          else
+            echo 'matrix={"branch": ["${{ github.event.inputs.branch_input }}"], "platform": ["linux64", "win64", "android-arm64", "osx64"]}' >> $GITHUB_OUTPUT
+          fi
+
+  build:
+    needs: setup-matrix
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJson(needs.setup-matrix.outputs.matrix) }}
+    name: Build ${{ matrix.branch }} on ${{ matrix.platform }}
+    runs-on: ${{ (matrix.platform == 'win64' && 'windows-2022') || (matrix.platform == 'osx64' && 'macos-latest') || 'ubuntu-22.04' }}
+    steps:
+      - name: Checkout Source
+        uses: actions/checkout@v4
+        with:
+          repository: xbmc/repo-scripts
+          ref: ${{ matrix.branch == 'Piers' && 'master' || 'Omega' }}
+          path: source/repo-scripts
+          fetch-depth: 1
+
+      - name: Setup Cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.ccache
+            source/repo-scripts/depends
+          key: ${{ runner.os }}-${{ matrix.branch }}-cache-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-${{ matrix.branch }}-cache-
+
+      - name: Build and Package
+        run: |
+          mkdir -p compiled
+          if [ "False" == "True" ]; then
+            echo "Performing C++ Build for ${{ matrix.platform }}..."
+            # Implementation for depends build and Kodi/Addon compilation goes here
+          else
+            echo "Packaging Python/XML Addon..."
+            cp -r source/repo-scripts/* compiled/
+          fi
+
+      - name: Create Archive
+        run: |
+          if [ "${{ matrix.platform }}" == "linux64" ]; then
+            tar -czf repo-scripts-${{ matrix.platform }}-${{ matrix.branch }}.tar.gz -C compiled .
+          else
+            cd compiled && zip -r ../repo-scripts-${{ matrix.platform }}-${{ matrix.branch }}.zip .
+          fi
+
+      - name: Dispatch to Distributor
+        env:
+          GH_TOKEN: ${{ secrets.GH_PAT }}
+        run: |
+          if [ -z "$GH_TOKEN" ]; then
+            echo "GH_PAT secret not found. Skipping cross-repo release."
+            exit 0
+          fi
+          TAG="v-$(date +'%Y%m%d')-${{ matrix.branch }}"
+          DIST_REPO="IamRPDev/repo-scripts-build-${{ matrix.platform }}"
+          FILE="repo-scripts-${{ matrix.platform }}-${{ matrix.branch }}.*"
+          gh release create "$TAG" $FILE \
+            --repo "$DIST_REPO" \
+            --title "Scripts ${{ matrix.branch }} Build $TAG" \
+            --notes "Automated build from repo-scripts-build." \
+            --prerelease || \
+          gh release upload "$TAG" $FILE --repo "$DIST_REPO" --clobber
