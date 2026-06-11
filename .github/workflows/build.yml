@@ -40,6 +40,9 @@ jobs:
       matrix: ${{ fromJson(needs.setup-matrix.outputs.matrix) }}
     name: Build ${{ matrix.branch }} on ${{ matrix.platform }}
     runs-on: ${{ (matrix.platform == 'win64' && 'windows-2022') || (matrix.platform == 'osx64' && 'macos-latest') || 'ubuntu-22.04' }}
+    defaults:
+      run:
+        shell: bash
     steps:
       - name: Checkout Source
         uses: actions/checkout@v4
@@ -49,29 +52,72 @@ jobs:
           path: source/repo-scripts
           fetch-depth: 1
 
+      - name: Install System Dependencies
+        run: |
+          if [ "${{ runner.os }}" == "Linux" ]; then
+            sudo apt update
+            sudo apt install -y build-essential autoconf automake autopoint gettext cmake curl gawk gperf python3-dev libtool zip unzip
+            if [ "${{ matrix.platform }}" == "linux64" ]; then
+              sudo add-apt-repository -s ppa:team-xbmc/xbmc-nightly -y || true
+              sudo apt build-dep kodi -y || echo "build-dep failed"
+            fi
+          elif [ "${{ runner.os }}" == "Windows" ]; then
+            choco install cmake ninja nasm -y
+          elif [ "${{ runner.os }}" == "macOS" ]; then
+            brew install cmake ninja nasm
+          fi
+
       - name: Setup Cache
         uses: actions/cache@v4
         with:
           path: |
             ~/.ccache
-            source/repo-scripts/depends
-          key: ${{ runner.os }}-${{ matrix.branch }}-cache-${{ github.sha }}
+            source/repo-scripts/tools/depends/native/*-native
+            source/repo-scripts/project/BuildDependencies
+          key: ${{ runner.os }}-${{ matrix.platform }}-${{ matrix.branch }}-cache-${{ github.sha }}
           restore-keys: |
-            ${{ runner.os }}-${{ matrix.branch }}-cache-
+            ${{ runner.os }}-${{ matrix.platform }}-${{ matrix.branch }}-cache-
 
       - name: Build and Package
         run: |
           mkdir -p compiled
           if [ "False" == "True" ]; then
-            echo "Performing C++ Build for ${{ matrix.platform }}..."
-            # Implementation for depends build and Kodi/Addon compilation goes here
+            echo "🚀 Performing C++ Build for ${{ matrix.platform }}..."
+            if [ "repo-scripts" == "xbmc" ]; then
+              # Kodi Core Build
+              if [ "${{ matrix.platform }}" == "linux64" ]; then
+                mkdir build && cd build
+                cmake ../source/xbmc -DCMAKE_INSTALL_PREFIX=../compiled -DAPP_RENDER_SYSTEM=gl
+                make -j$(nproc) install
+              else
+                # For Win/Android/OSX we use the depends system
+                cd source/xbmc/tools/depends
+                ./bootstrap
+                # Simplified config for demonstration, in reality requires platform-specific flags
+                ./configure --prefix=$(pwd)/../../../../xbmc-deps
+                make -j$(nproc || sysctl -n hw.ncpu)
+                cd ../../../
+                mkdir build && cd build
+                cmake ../source/xbmc -DCMAKE_INSTALL_PREFIX=../compiled -DCMAKE_PREFIX_PATH=$(pwd)/../xbmc-deps
+                make -j$(nproc || sysctl -n hw.ncpu) install
+              fi
+            else
+              # Addon Build (inputstream)
+              mkdir build && cd build
+              cmake ../source/repo-scripts -DCMAKE_INSTALL_PREFIX=../compiled
+              make -j$(nproc || sysctl -n hw.ncpu) install
+            fi
           else
-            echo "Packaging Python/XML Addon..."
-            cp -r source/repo-scripts/* compiled/
+            echo "📦 Packaging Python/XML Addon..."
+            cp -rv source/repo-scripts/* compiled/ || echo "No files to copy"
+            # Ensure we have a dummy file to avoid zip error if empty
+            touch compiled/.kodi_build_marker
           fi
 
       - name: Create Archive
         run: |
+          TAG="v-$(date +'%Y%m%d')-${{ matrix.branch }}"
+          echo "TAG=$TAG" >> $GITHUB_ENV
           if [ "${{ matrix.platform }}" == "linux64" ]; then
             tar -czf repo-scripts-${{ matrix.platform }}-${{ matrix.branch }}.tar.gz -C compiled .
           else
@@ -86,7 +132,6 @@ jobs:
             echo "GH_PAT secret not found. Skipping cross-repo release."
             exit 0
           fi
-          TAG="v-$(date +'%Y%m%d')-${{ matrix.branch }}"
           DIST_REPO="IamRPDev/repo-scripts-build-${{ matrix.platform }}"
           FILE="repo-scripts-${{ matrix.platform }}-${{ matrix.branch }}.*"
           gh release create "$TAG" $FILE \
