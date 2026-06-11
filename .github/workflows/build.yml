@@ -62,7 +62,7 @@ jobs:
               sudo apt build-dep kodi -y || echo "build-dep failed"
             fi
           elif [ "${{ runner.os }}" == "Windows" ]; then
-            choco install cmake ninja nasm -y
+            choco install cmake ninja nasm zip -y
           elif [ "${{ runner.os }}" == "macOS" ]; then
             brew install cmake ninja nasm
           fi
