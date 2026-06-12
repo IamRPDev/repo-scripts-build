@@ -84,26 +84,21 @@ jobs:
           if [ "False" == "True" ]; then
             echo "🚀 Performing C++ Build for ${{ matrix.platform }}..."
             if [ "repo-scripts" == "xbmc" ]; then
-              if [ "${{ matrix.platform }}" == "linux64" ]; then
-                mkdir build && cd build
-                cmake ../source/xbmc -DCMAKE_INSTALL_PREFIX=../$OUT_DIR -DAPP_RENDER_SYSTEM=gl
-                make -j$(nproc) install
-              else
-                # Cross-compilation or non-linux native using depends
-                cd source/xbmc/tools/depends
-                ./bootstrap
-                case "${{ matrix.platform }}" in
-                  win64) export CONFIG_FLAGS="--host=x86_64-w64-mingw32 --with-platform=windows" ;;
-                  android-arm64) export CONFIG_FLAGS="--host=aarch64-linux-android --with-platform=android --with-sdk=/opt/android-sdk --with-ndk=/opt/android-sdk/ndk-bundle" ;;
-                  osx64) export CONFIG_FLAGS="--with-platform=macos" ;;
-                esac
-                ./configure --prefix=$(pwd)/../../../../xbmc-deps $CONFIG_FLAGS
-                make -j$(nproc || sysctl -n hw.ncpu)
-                cd ../../../
-                mkdir build && cd build
-                cmake ../source/xbmc -DCMAKE_INSTALL_PREFIX=../$OUT_DIR -DCMAKE_PREFIX_PATH=$(pwd)/../xbmc-deps
-                make -j$(nproc || sysctl -n hw.ncpu) install
-              fi
+              # All Core platforms use depends for consistency
+              cd source/xbmc/tools/depends
+              ./bootstrap
+              case "${{ matrix.platform }}" in
+                win64) export CONFIG_FLAGS="--host=x86_64-w64-mingw32 --with-platform=windows" ;;
+                android-arm64) export CONFIG_FLAGS="--host=aarch64-linux-android --with-platform=android --with-sdk=/opt/android-sdk --with-ndk=/opt/android-sdk/ndk-bundle" ;;
+                osx64) export CONFIG_FLAGS="--with-platform=macos" ;;
+                linux64) export CONFIG_FLAGS="--with-platform=linux --with-rendersystem=gl" ;;
+              esac
+              ./configure --prefix=$(pwd)/../../../../xbmc-deps $CONFIG_FLAGS
+              make -j$(nproc || sysctl -n hw.ncpu)
+              cd ../../../
+              mkdir build && cd build
+              cmake ../source/xbmc -DCMAKE_INSTALL_PREFIX=../$OUT_DIR -DCMAKE_PREFIX_PATH=$(pwd)/../xbmc-deps
+              make -j$(nproc || sysctl -n hw.ncpu) install
             else
               # Addon C++ Build
               mkdir build && cd build
