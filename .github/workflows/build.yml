@@ -39,7 +39,7 @@ jobs:
       fail-fast: false
       matrix: ${{ fromJson(needs.setup-matrix.outputs.matrix) }}
     name: Build ${{ matrix.branch }} on ${{ matrix.platform }}
-    runs-on: ${{ (matrix.platform == 'win64' && 'windows-2022') || (matrix.platform == 'osx64' && 'macos-latest') || 'ubuntu-22.04' }}
+    runs-on: ${{ (matrix.platform == 'osx64' && 'macos-latest') || ('False' == 'True' && fromJSON('["self-hosted", "linux64"]') || fromJSON('["self-hosted", "lightweight"]')) }}
     defaults:
       run:
         shell: bash
@@ -56,7 +56,15 @@ jobs:
         run: |
           if [ "${{ runner.os }}" == "Linux" ]; then
             sudo apt update
-            sudo apt install -y build-essential autoconf automake autopoint gettext cmake curl gawk gperf python3-dev libtool zip unzip
+            sudo apt install -y build-essential autoconf automake autopoint gettext cmake curl gawk gperf python3-dev libtool zip unzip \
+              libudev-dev libdrm-dev libgbm-dev libasound2-dev libpulse-dev libva-dev libvdpau-dev libxml2-dev libxslt1-dev \
+              libsqlite3-dev libcurl4-openssl-dev libssl-dev libbluray-dev libcdio-dev libiso9660-dev liblzo2-dev libpcre3-dev \
+              libmysqlclient-dev libcap-dev libfribidi-dev libfontconfig1-dev libfreetype6-dev libass-dev libfribidi-dev \
+              libdbus-1-dev libsystemd-dev libavahi-client-dev libavahi-common-dev libmicrohttpd-dev libtinyxml-dev \
+              libyajl-dev libplist-dev libnfs-dev libshairplay-dev libsmbclient-dev libfmt-dev libspdlog-dev libflatbuffers-dev
+            if [ "${{ matrix.platform }}" == "linux64" ]; then
+              sudo apt install -y libx11-dev libxext-dev libxrandr-dev libxinerama-dev libxcursor-dev libxi-dev libxrender-dev libxss-dev libgl1-mesa-dev
+            fi
           elif [ "${{ runner.os }}" == "Windows" ]; then
             choco install cmake ninja nasm zip -y
           elif [ "${{ runner.os }}" == "macOS" ]; then
@@ -86,9 +94,15 @@ jobs:
                 cmake ../source/xbmc -DCMAKE_INSTALL_PREFIX=../$OUT_DIR -DAPP_RENDER_SYSTEM=gl
                 make -j$(nproc) install
               else
-                # Non-linux platforms use depends
-                cd source/xbmc/tools/depends && ./bootstrap
-                ./configure --prefix=$(pwd)/../../../../xbmc-deps
+                # Cross-compilation or non-linux native using depends
+                cd source/xbmc/tools/depends
+                ./bootstrap
+                case "${{ matrix.platform }}" in
+                  win64) CONFIG_FLAGS="--host=x86_64-w64-mingw32" ;;
+                  android-arm64) CONFIG_FLAGS="--host=aarch64-linux-android --with-sdk=/opt/android-sdk --with-ndk=/opt/android-sdk/ndk-bundle" ;;
+                  osx64) CONFIG_FLAGS="--host=x86_64-apple-darwin --with-platform=darwin" ;;
+                esac
+                ./configure --prefix=$(pwd)/../../../../xbmc-deps $CONFIG_FLAGS
                 make -j$(nproc || sysctl -n hw.ncpu)
                 cd ../../../
                 mkdir build && cd build
@@ -96,8 +110,10 @@ jobs:
                 make -j$(nproc || sysctl -n hw.ncpu) install
               fi
             else
+              # Addon C++ Build
               mkdir build && cd build
-              cmake ../source/repo-scripts -DCMAKE_INSTALL_PREFIX=../$OUT_DIR
+              # Try to find KodiConfig.cmake if it was built in a previous step or provided
+              cmake ../source/repo-scripts -DCMAKE_INSTALL_PREFIX=../$OUT_DIR -DKodi_DIR=$(pwd)/../xbmc-deps/lib/kodi
               make -j$(nproc || sysctl -n hw.ncpu) install
             fi
           else
