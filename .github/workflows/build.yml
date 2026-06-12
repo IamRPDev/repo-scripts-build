@@ -53,19 +53,9 @@ jobs:
           fetch-depth: 1
 
       - name: Install System Dependencies
-        if: ${{ !contains(runner.labels, 'self-hosted') }}
+        if: ${{ matrix.platform == 'osx64' }}
         run: |
-          if [ "${{ runner.os }}" == "Linux" ]; then
-            sudo apt update
-            sudo apt install -y build-essential autoconf automake autopoint gettext cmake curl gawk gperf python3-dev libtool zip unzip libudev-dev libdrm-dev libgbm-dev libasound2-dev libpulse-dev libva-dev libvdpau-dev libxml2-dev libxslt1-dev libsqlite3-dev libcurl4-openssl-dev libssl-dev libbluray-dev libcdio-dev libiso9660-dev liblzo2-dev libpcre3-dev libmysqlclient-dev libcap-dev libfribidi-dev libfontconfig1-dev libfreetype6-dev libass-dev libdbus-1-dev libsystemd-dev libavahi-client-dev libavahi-common-dev libmicrohttpd-dev libtinyxml-dev libyajl-dev libplist-dev libnfs-dev libshairplay-dev libsmbclient-dev libfmt-dev libspdlog-dev libflatbuffers-dev
-            if [ "${{ matrix.platform }}" == "linux64" ]; then
-              sudo apt install -y libx11-dev libxext-dev libxrandr-dev libxinerama-dev libxcursor-dev libxi-dev libxrender-dev libxss-dev libgl1-mesa-dev
-            fi
-          elif [ "${{ runner.os }}" == "Windows" ]; then
-            choco install cmake ninja nasm zip -y
-          elif [ "${{ runner.os }}" == "macOS" ]; then
-            brew install cmake ninja nasm
-          fi
+          brew install cmake ninja nasm gettext coreutils
 
       - name: Build and Package
         run: |
