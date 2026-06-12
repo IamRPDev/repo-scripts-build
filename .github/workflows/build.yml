@@ -100,7 +100,7 @@ jobs:
                 case "${{ matrix.platform }}" in
                   win64) CONFIG_FLAGS="--host=x86_64-w64-mingw32" ;;
                   android-arm64) CONFIG_FLAGS="--host=aarch64-linux-android --with-sdk=/opt/android-sdk --with-ndk=/opt/android-sdk/ndk-bundle" ;;
-                  osx64) CONFIG_FLAGS="--host=x86_64-apple-darwin --with-platform=darwin" ;;
+                  osx64) CONFIG_FLAGS="--with-platform=macos" ;;
                 esac
                 ./configure --prefix=$(pwd)/../../../../xbmc-deps $CONFIG_FLAGS
                 make -j$(nproc || sysctl -n hw.ncpu)
