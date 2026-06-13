@@ -39,7 +39,7 @@ jobs:
       fail-fast: false
       matrix: ${{ fromJson(needs.setup-matrix.outputs.matrix) }}
     name: Build ${{ matrix.branch }} on ${{ matrix.platform }}
-    runs-on: ${{ (matrix.platform == 'osx64' && 'macos-latest') || (matrix.platform == 'linux64' && fromJSON('["self-hosted", "linux64"]')) || fromJSON('["self-hosted", "lightweight"]') }}
+    runs-on: ${{ (matrix.platform == 'osx64' && 'macos-latest') || (false && fromJSON('["self-hosted", "linux64"]')) || fromJSON('["self-hosted", "lightweight"]') }}
     defaults:
       run:
         shell: bash
@@ -80,7 +80,7 @@ jobs:
             if [ "repo-scripts" == "xbmc" ]; then
               if [ "${{ matrix.platform }}" == "linux64" ]; then
                 mkdir build && cd build
-                cmake ${{ github.workspace }}/source/xbmc -DCMAKE_INSTALL_PREFIX="$OUT_DIR" -DAPP_RENDER_SYSTEM=gl
+                cmake ${{ github.workspace }}/source/xbmc -DCMAKE_INSTALL_PREFIX="$OUT_DIR" -DAPP_RENDER_SYSTEM=gl -DENABLE_INTERNAL_FFMPEG=ON -DENABLE_INTERNAL_EXIV2=ON -DENABLE_INTERNAL_DAV1D=ON
                 make -j$(nproc || sysctl -n hw.ncpu) install
               else
                 # Cross-compilation or non-linux native using depends
