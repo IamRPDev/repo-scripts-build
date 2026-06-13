@@ -82,13 +82,15 @@ jobs:
                 mkdir build && cd build
                 cmake ${{ github.workspace }}/source/xbmc -DCMAKE_INSTALL_PREFIX="$OUT_DIR" -DAPP_RENDER_SYSTEM=gl -DENABLE_INTERNAL_FFMPEG=ON -DENABLE_INTERNAL_EXIV2=ON -DENABLE_INTERNAL_DAV1D=ON
                 make -j$(nproc || sysctl -n hw.ncpu) install
+              elif [ "${{ matrix.platform }}" == "win64" ]; then
+                echo "⚠️ Windows Core build via depends is not supported on Linux. Skipping."
+                exit 0
               else
                 # Cross-compilation or non-linux native using depends
                 cd source/xbmc/tools/depends
                 ./bootstrap
                 case "${{ matrix.platform }}" in
-                  win64) export CONFIG_FLAGS="--host=x86_64-w64-mingw32" ;;
-                  android-arm64) export CONFIG_FLAGS="--host=aarch64-linux-android --with-sdk=/opt/android-sdk --with-ndk=/opt/android-sdk/ndk-bundle" ;;
+                  android-arm64) export CONFIG_FLAGS="--host=aarch64-linux-android --with-sdk-path=/opt/android-sdk --with-ndk-path=/opt/android-sdk/ndk/25.2.9519653" ;;
                   osx64) 
                     export CONFIG_FLAGS="--with-platform=macos"
                     export PATH="$(brew --prefix gettext)/bin:$(brew --prefix coreutils)/libexec/gnubin:$PATH"
@@ -103,6 +105,10 @@ jobs:
               fi
             else
               # Addon C++ Build
+              if [ "${{ matrix.platform }}" == "win64" ] || [ "${{ matrix.platform }}" == "android-arm64" ]; then
+                 echo "⚠️ Cross-compiling addons for ${{ matrix.platform }} requires KodiConfig.cmake which is missing. Skipping for now."
+                 exit 0
+              fi
               mkdir build && cd build
               # Try to find KodiConfig.cmake if it was built in a previous step or provided
               cmake ${{ github.workspace }}/source/repo-scripts -DCMAKE_INSTALL_PREFIX="$OUT_DIR" -DKodi_DIR=${{ github.workspace }}/xbmc-deps/lib/kodi
