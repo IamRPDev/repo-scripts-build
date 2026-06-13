@@ -156,8 +156,9 @@ jobs:
           
           # Create local release in this repo
           gh release create "$TAG" $FILE \
+            --repo "RPDevs-Builds/repo-scripts-build" \
             --title "Scripts ${{ matrix.branch }} Build $TAG" \
             --notes "Automated build for ${{ matrix.platform }}." \
             --prerelease || \
-          gh release upload "$TAG" $FILE --clobber
+          gh release upload "$TAG" $FILE --repo "RPDevs-Builds/repo-scripts-build" --clobber
 
