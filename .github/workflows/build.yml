@@ -83,7 +83,8 @@ jobs:
                 cmake ${{ github.workspace }}/source/xbmc -DCMAKE_INSTALL_PREFIX="$OUT_DIR" -DAPP_RENDER_SYSTEM=gl \
                   -DENABLE_INTERNAL_FFMPEG=ON -DENABLE_INTERNAL_EXIV2=ON -DENABLE_INTERNAL_DAV1D=ON \
                   -DENABLE_INTERNAL_FSTRCMP=ON -DENABLE_INTERNAL_FLATBUFFERS=ON -DENABLE_INTERNAL_UDFREAD=ON \
-                  -DENABLE_INTERNAL_SPDLOG=ON -DENABLE_INTERNAL_FMT=ON
+                  -DENABLE_INTERNAL_SPDLOG=ON -DENABLE_INTERNAL_FMT=ON -DENABLE_INTERNAL_NLOHMANNJSON=ON \
+                  -DENABLE_INTERNAL_RAPIDJSON=ON -DENABLE_INTERNAL_CROSSGUID=ON
                 make -j$(nproc || sysctl -n hw.ncpu) install
               elif [ "${{ matrix.platform }}" == "win64" ]; then
                 echo "⚠️ Windows Core build via depends is not supported on Linux. Skipping."
